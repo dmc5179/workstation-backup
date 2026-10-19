@@ -138,7 +138,9 @@ concurrency_for() {
     fi
     if spd=$(usb_speed_of "$dev"); then
         if (( spd >= 5000 )); then
-            info "USB link: ${spd} Mbps - good"
+            # MUST go to stderr: this function's stdout is parsed by the
+            # caller. 'warn' is already stderr; plain 'info' is not.
+            info "USB link: ${spd} Mbps - good" >&2
             echo "16 32"; return
         fi
         warn "========================================================================"

@@ -87,6 +87,10 @@ if [[ -n $SRCDEV ]]; then
     (( NO_TUNE || DRY_RUN )) || io_tune "$SRCDEV"
 fi
 : "${TRANSFERS:=8}" "${CHECKERS:=16}"
+# concurrency_for's stdout is parsed; guard against anything stray landing in
+# these and being handed to rclone as a flag value.
+[[ $TRANSFERS =~ ^[0-9]+$ ]] || { warn "non-numeric --transfers ('$TRANSFERS'); using 8";  TRANSFERS=8; }
+[[ $CHECKERS  =~ ^[0-9]+$ ]] || { warn "non-numeric --checkers ('$CHECKERS'); using 16";   CHECKERS=16; }
 
 if pgrep -f 'firefox|google-chrome|chromium|thunderbird' >/dev/null 2>&1; then
     warn "a browser is running. Quit it before restoring, or the running instance"

@@ -210,6 +210,10 @@ else
     warn "could not resolve the destination block device; using conservative defaults"
 fi
 : "${TRANSFERS:=8}" "${CHECKERS:=16}"
+# concurrency_for's stdout is parsed, so anything stray printed there would be
+# passed to rclone as a flag value and fail obscurely. Catch it here instead.
+[[ $TRANSFERS =~ ^[0-9]+$ ]] || { warn "non-numeric --transfers ('$TRANSFERS'); using 8";  TRANSFERS=8; }
+[[ $CHECKERS  =~ ^[0-9]+$ ]] || { warn "non-numeric --checkers ('$CHECKERS'); using 16";   CHECKERS=16; }
 
 if pgrep -f 'firefox|google-chrome|chromium|thunderbird' >/dev/null 2>&1; then
     warn "a browser or mail client appears to be running."
