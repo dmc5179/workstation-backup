@@ -112,16 +112,16 @@ elif [[ ! -s $FILTER_FILE ]]; then
 # that down to 401 GiB / 3,927,573 files.
 
 # --- Always keep these, whatever the rules below say -------------------------
-+ .ssh/**
-+ .gnupg/**
-+ .pki/**
-+ .password-store/**
-+ .local/share/keyrings/**
-+ .aws/**
-+ .kube/**
-+ .config/gcloud/**
-+ .mozilla/firefox/*/places.sqlite
-+ .mozilla/firefox/*/bookmarkbackups/**
++ /.ssh/**
++ /.gnupg/**
++ /.pki/**
++ /.password-store/**
++ /.local/share/keyrings/**
++ /.aws/**
++ /.kube/**
++ /.config/gcloud/**
++ /.mozilla/firefox/*/places.sqlite
++ /.mozilla/firefox/*/bookmarkbackups/**
 
 # Claude CLI: settings, MCP config, agents, skills, plugins and session
 # history. These MUST come before the **/node_modules/** rule below --
@@ -129,12 +129,12 @@ elif [[ ! -s $FILTER_FILE ]]; then
 # that the generic rule would otherwise strip, breaking the plugin on restore.
 # ~/.local/bin/claude is a symlink into .local/share/claude/versions, so that
 # directory has to come across too or the CLI is a dangling link.
-+ .claude/**
-+ .claude.json
-+ .claude.json.backup
-+ .config/claude-personal/**
-+ .local/share/claude/**
-+ .local/bin/**
++ /.claude/**
++ /.claude.json
++ /.claude.json.backup
++ /.config/claude-personal/**
++ /.local/share/claude/**
++ /.local/bin/**
 
 # --- Podman container storage: 126G, and actively harmful to restore. --------
 # Overlay layer metadata is bound to the local storage driver and UID mapping;
