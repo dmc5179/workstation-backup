@@ -17,6 +17,7 @@ source "$HERE/lib-common.sh"
 SRCDIR="" TARGET="${HOME%/}"
 DRY_RUN=0 ASSUME_YES=0 NO_OVERWRITE=0 RELABEL=0 NO_TUNE=0 VERIFY=""
 TRANSFERS="" CHECKERS=""
+LOG_LEVEL=NOTICE
 
 usage() {
     cat <<EOF
@@ -30,6 +31,7 @@ Options:
   --no-overwrite   Never replace a file that already exists on this machine
   --relabel        Run 'sudo restorecon -R' on the target afterwards (SELinux)
   --no-tune        Do not touch the source disk's I/O scheduler
+  --log-info       Log every file restored (default: compact stats-only log)
   --transfers N    Parallel transfers (default: auto from link speed)
   --checkers N     Parallel checkers (default: auto)
   --verify         Verify by size after restoring
@@ -46,6 +48,7 @@ while (( $# )); do
         --no-overwrite) NO_OVERWRITE=1; shift ;;
         --relabel)      RELABEL=1; shift ;;
         --no-tune)      NO_TUNE=1; shift ;;
+        --log-info)     LOG_LEVEL=INFO; shift ;;
         --transfers)    TRANSFERS=${2:?}; shift 2 ;;
         --checkers)     CHECKERS=${2:?}; shift 2 ;;
         --verify)       VERIFY='fast'; shift ;;
@@ -108,7 +111,7 @@ OPTS=(
     --links --metadata --create-empty-src-dirs
     --transfers "$TRANSFERS" --checkers "$CHECKERS"
     --retries 3 --low-level-retries 10
-    --log-file "$LOG" --log-level INFO
+    --log-file "$LOG" --log-level "$LOG_LEVEL" --stats-log-level NOTICE
     --stats 30s --stats-one-line
 )
 [[ -t 1 ]]         && OPTS+=( --progress )

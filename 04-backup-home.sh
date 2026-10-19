@@ -20,6 +20,10 @@ DEST=""
 FILTER_OVERRIDE=""
 DRY_RUN=0 ASSUME_YES=0 SKIP_SIZE=0 MIRROR=0 NO_TUNE=0 VERIFY=""
 TRANSFERS="" CHECKERS=""
+# NOTICE keeps the log to stats + problems only. At INFO, rclone writes one
+# line per file: ~3.9M lines and ~200 MB for this data set, which also buries
+# the periodic stats and makes 'tail -f' useless.
+LOG_LEVEL=NOTICE
 
 usage() {
     cat <<EOF
@@ -35,6 +39,8 @@ Options:
   --transfers N    Parallel file transfers (default: auto from link speed)
   --checkers N     Parallel checkers (default: auto)
   --no-tune        Do not touch the destination disk's I/O scheduler
+  --log-info       Log every file copied (~200 MB of log here; default is a
+                   compact log of progress stats, warnings and errors only)
   --verify         After copying, verify dest against source by size
   --verify-hash    After copying, verify with MD5 of every file (very slow here)
   --skip-size      Skip the pre-flight free-space estimate
@@ -51,6 +57,7 @@ while (( $# )); do
         --transfers)   TRANSFERS=${2:?}; shift 2 ;;
         --checkers)    CHECKERS=${2:?}; shift 2 ;;
         --no-tune)     NO_TUNE=1; shift ;;
+        --log-info)    LOG_LEVEL=INFO; shift ;;
         --verify)      VERIFY='fast'; shift ;;
         --verify-hash) VERIFY='hash'; shift ;;
         --skip-size)   SKIP_SIZE=1; shift ;;
@@ -228,6 +235,10 @@ cat <<EOF
   Concurrency: --transfers $TRANSFERS --checkers $CHECKERS
   Log:         $LOG
 
+  Live progress prints here. To watch from another terminal, or after
+  detaching from tmux:
+      tail -f $LOG
+
 EOF
 
 if (( ! ASSUME_YES && ! DRY_RUN )); then
@@ -318,9 +329,10 @@ OPTS=(
     --low-level-retries 10
     --filter-from "$FILTER_FILE"
     --log-file "$LOG"
-    --log-level INFO
+    --log-level "$LOG_LEVEL"
     --stats 30s
     --stats-one-line
+    --stats-log-level NOTICE   # stats still reach the log when LOG_LEVEL=NOTICE
 )
 [[ -t 1 ]]    && OPTS+=( --progress )
 (( DRY_RUN )) && OPTS+=( --dry-run )
