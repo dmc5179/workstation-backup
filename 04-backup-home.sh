@@ -118,6 +118,12 @@ elif [[ ! -s $FILTER_FILE ]]; then
 # slash means only the extracted DIRECTORY is skipped), so nothing is lost.
 - **/sosreport-*/
 
+# The last two read-only trees on this machine: extracted filesystem
+# snapshots under ansible collection working dirs, and the dirtyconf tree
+# in an old preupgrade report. 13 directories, 1,504 files, all disposable.
+- **/index_tmp_*/
+- **/dirtyconf/
+
 #
 # Measured on 2026-10-19: $HOME is 598G across ~4.5M files. These rules bring
 # that down to 401 GiB / 3,927,573 files.
