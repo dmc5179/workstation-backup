@@ -91,6 +91,22 @@ elif [[ ! -s $FILTER_FILE ]]; then
 # rclone filter rules for the home-directory backup. FIRST MATCH WINS.
 # '-' excludes, '+' includes. Patterns are relative to $HOME.
 # Edit this file and re-run the backup to change what gets copied.
+
+# --- Hard directory prunes ---------------------------------------------------
+# A trailing-slash rule excludes the DIRECTORY ITSELF, which stops rclone
+# descending into it. The '/**' form further down only excludes the contents,
+# so rclone still walks in and trips over unreadable subdirectories. That is
+# the entire source of the "permission denied" noise on this machine:
+#   .local/share/containers  rootless podman overlay, UID-mapped and unreadable
+#                            (36 unreadable dirs, 1,849 unreadable files)
+#   .local/share/waydroid    data dir owned by another user
+#   sosreport-*/proc, /sys   captured kernel pseudo-files: write-only stubs
+#                            (mode --w-------), 577 of them, zero value
+- .local/share/containers/
+- .local/share/waydroid/
+- **/sosreport-*/proc/
+- **/sosreport-*/sys/
+
 #
 # Measured on 2026-10-19: $HOME is 598G across ~4.5M files. These rules bring
 # that down to 401 GiB / 3,927,573 files.
