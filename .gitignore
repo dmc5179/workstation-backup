@@ -1,0 +1,57 @@
+# ---------------------------------------------------------------------------
+# Captured inventories and backup output.
+#
+# The capture scripts default to writing into $PWD when given no argument, so
+# without these rules a stray run would commit host details, installed-package
+# lists, MCP server configuration and session logs straight to a PUBLIC repo.
+# ---------------------------------------------------------------------------
+packages-*/
+claude-*/
+meta/
+home/
+backup-*/
+laptop-*/
+
+# Generated restore helpers (they are produced by 02 and 03 at capture time)
+06-reinstall-packages.sh
+07-restore-claude.sh
+
+# Logs, manifests and scratch output
+*.log
+*.tsv
+*.jsonl
+*.sqlite
+*.sqlite-*
+*.partial
+*.jsonlz4
+filters.txt
+backup-info.txt
+toolchain-versions.txt
+bookmarks/
+repos/
+extras/
+config/
+
+# ---------------------------------------------------------------------------
+# Credentials. None of these belong in a repo under any circumstances.
+# ---------------------------------------------------------------------------
+.credentials.json
+*claude.json*
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+id_ecdsa*
+*.kdbx
+.env
+.envrc
+.netrc
+
+# Editor / OS noise
+*.swp
+*~
+.DS_Store
+.idea/
+.vscode/
