@@ -15,7 +15,7 @@ HERE=$(cd -- "$(dirname -- "$(readlink -f "$0")")" && pwd)
 source "$HERE/lib-common.sh"
 
 SRCDIR="" TARGET="${HOME%/}"
-DRY_RUN=0 ASSUME_YES=0 NO_OVERWRITE=0 RELABEL=0 NO_TUNE=0 VERIFY=""
+DRY_RUN=0 ASSUME_YES=0 NO_OVERWRITE=0 RELABEL=0 TUNE=0 VERIFY=""
 TRANSFERS="" CHECKERS=""
 LOG_LEVEL=NOTICE
 
@@ -30,7 +30,7 @@ Options:
   --into DIR       Restore into DIR instead of \$HOME (useful for a staging run)
   --no-overwrite   Never replace a file that already exists on this machine
   --relabel        Run 'sudo restorecon -R' on the target afterwards (SELinux)
-  --no-tune        Do not touch the source disk's I/O scheduler
+  --tune           Switch the source disk to mq-deadline for the run (needs sudo)
   --log-info       Log every file restored (default: compact stats-only log)
   --transfers N    Parallel transfers (default: auto from link speed)
   --checkers N     Parallel checkers (default: auto)
@@ -47,7 +47,7 @@ while (( $# )); do
         --into)         TARGET=${2:?}; TARGET=${TARGET%/}; shift 2 ;;
         --no-overwrite) NO_OVERWRITE=1; shift ;;
         --relabel)      RELABEL=1; shift ;;
-        --no-tune)      NO_TUNE=1; shift ;;
+        --tune)          TUNE=1; shift ;;
         --log-info)     LOG_LEVEL=INFO; shift ;;
         --transfers)    TRANSFERS=${2:?}; shift 2 ;;
         --checkers)     CHECKERS=${2:?}; shift 2 ;;
@@ -84,7 +84,7 @@ if [[ -n $SRCDEV ]]; then
     read -r AUTO_T AUTO_C < <(concurrency_for "$SRCDEV")
     [[ -n $TRANSFERS ]] || TRANSFERS=$AUTO_T
     [[ -n $CHECKERS  ]] || CHECKERS=$AUTO_C
-    (( NO_TUNE || DRY_RUN )) || io_tune "$SRCDEV"
+    if (( TUNE )) && (( ! DRY_RUN )); then io_tune "$SRCDEV"; fi
 fi
 : "${TRANSFERS:=8}" "${CHECKERS:=16}"
 # concurrency_for's stdout is parsed; guard against anything stray landing in

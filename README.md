@@ -313,7 +313,7 @@ both directions: it batches sequential writes for the backup and already
 prioritises reads (500 ms expiry vs 5 s) for the restore.
 
 The internal NVMe is deliberately left alone — `none` with 12 hardware queues
-is already correct. Skip the whole thing with `--no-tune`.
+is already correct. I/O tuning is opt-in via `--tune`.
 
 Expect a few percent from this, not a transformation. The real limits are the
 USB link rate and per-file overhead across 3.9M files.

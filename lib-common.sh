@@ -118,9 +118,22 @@ io_restore() {
     [[ -n $IO_TUNED_DEV ]] || return 0
     local dev=$IO_TUNED_DEV
     IO_TUNED_DEV=""      # guard against re-entry from nested traps
-    [[ -n $IO_SAVED_SCHED ]] && printf '%s\n' "$IO_SAVED_SCHED" | sudo -n tee "/sys/block/$dev/queue/scheduler"   >/dev/null 2>&1 || true
-    [[ -n $IO_SAVED_NRREQ ]] && printf '%s\n' "$IO_SAVED_NRREQ" | sudo -n tee "/sys/block/$dev/queue/nr_requests" >/dev/null 2>&1 || true
-    info "restored I/O settings on /dev/$dev (scheduler=$(_sched_current "$dev"), nr_requests=$(cat /sys/block/$dev/queue/nr_requests 2>/dev/null))"
+
+    # sudo's timestamp expires (5 min by default) and these runs last hours,
+    # so by exit time 'sudo -n' usually fails. Never swallow that: say so and
+    # hand over the exact commands, rather than claiming a revert that did
+    # not happen.
+    if ! sudo -n true 2>/dev/null; then
+        warn "cannot revert I/O settings on /dev/$dev -- sudo credentials have expired."
+        warn "/dev/$dev is still $(_sched_current "$dev") / nr_requests=$(cat "/sys/block/$dev/queue/nr_requests" 2>/dev/null)."
+        warn "This is not persistent (a reboot clears it). To restore now:"
+        warn "    echo $IO_SAVED_SCHED | sudo tee /sys/block/$dev/queue/scheduler"
+        warn "    echo $IO_SAVED_NRREQ | sudo tee /sys/block/$dev/queue/nr_requests"
+        return 0
+    fi
+    [[ -n $IO_SAVED_SCHED ]] && printf '%s\n' "$IO_SAVED_SCHED" | sudo -n tee "/sys/block/$dev/queue/scheduler"   >/dev/null 2>&1
+    [[ -n $IO_SAVED_NRREQ ]] && printf '%s\n' "$IO_SAVED_NRREQ" | sudo -n tee "/sys/block/$dev/queue/nr_requests" >/dev/null 2>&1
+    info "restored I/O settings on /dev/$dev (scheduler=$(_sched_current "$dev"), nr_requests=$(cat "/sys/block/$dev/queue/nr_requests" 2>/dev/null))"
 }
 
 # ---------------------------------------------------------------------------

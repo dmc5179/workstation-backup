@@ -18,7 +18,7 @@ source "$HERE/lib-common.sh"
 SRC="${HOME%/}"
 DEST=""
 FILTER_OVERRIDE=""
-DRY_RUN=0 ASSUME_YES=0 SKIP_SIZE=0 MIRROR=0 NO_TUNE=0 VERIFY=""
+DRY_RUN=0 ASSUME_YES=0 SKIP_SIZE=0 MIRROR=0 TUNE=0 VERIFY=""
 TRANSFERS="" CHECKERS=""
 # NOTICE keeps the log to stats + problems only. At INFO, rclone writes one
 # line per file: ~3.9M lines and ~200 MB for this data set, which also buries
@@ -38,7 +38,8 @@ Options:
   --mirror         Use 'rclone sync' (deletes extras at dest) instead of 'copy'
   --transfers N    Parallel file transfers (default: auto from link speed)
   --checkers N     Parallel checkers (default: auto)
-  --no-tune        Do not touch the destination disk's I/O scheduler
+  --tune           Switch the destination disk to mq-deadline for the run
+                   (needs sudo; a few percent at best on this workload)
   --log-info       Log every file copied (~200 MB of log here; default is a
                    compact log of progress stats, warnings and errors only)
   --verify         After copying, verify dest against source by size
@@ -56,7 +57,7 @@ while (( $# )); do
         --mirror)      MIRROR=1; shift ;;
         --transfers)   TRANSFERS=${2:?}; shift 2 ;;
         --checkers)    CHECKERS=${2:?}; shift 2 ;;
-        --no-tune)     NO_TUNE=1; shift ;;
+        --tune)         TUNE=1; shift ;;
         --log-info)    LOG_LEVEL=INFO; shift ;;
         --verify)      VERIFY='fast'; shift ;;
         --verify-hash) VERIFY='hash'; shift ;;
@@ -104,8 +105,18 @@ elif [[ ! -s $FILTER_FILE ]]; then
 #                            (mode --w-------), 577 of them, zero value
 - .local/share/containers/
 - .local/share/waydroid/
-- **/sosreport-*/proc/
-- **/sosreport-*/sys/
+
+# Go module caches are READ-ONLY trees (dr-xr-xr-x). With --metadata rclone
+# recreates those modes on the destination and then cannot mkdir or write
+# inside them: 8,609 failures on the first real run. Matched unanchored on
+# purpose -- this machine has two GOPATHs (~/go and ~/goproj1), 188,665
+# read-only directories between them. All of it is re-downloadable.
+- **/pkg/mod/
+
+# Extracted sosreports: read-only directory trees full of write-only /proc
+# and /sys stubs. The original .tar archives are backed up (the trailing
+# slash means only the extracted DIRECTORY is skipped), so nothing is lost.
+- **/sosreport-*/
 
 #
 # Measured on 2026-10-19: $HOME is 598G across ~4.5M files. These rules bring
@@ -221,7 +232,7 @@ if [[ -n $DESTDEV ]]; then
     read -r AUTO_T AUTO_C < <(concurrency_for "$DESTDEV")
     [[ -n $TRANSFERS ]] || TRANSFERS=$AUTO_T
     [[ -n $CHECKERS  ]] || CHECKERS=$AUTO_C
-    (( NO_TUNE || DRY_RUN )) || io_tune "$DESTDEV"
+    if (( TUNE )) && (( ! DRY_RUN )); then io_tune "$DESTDEV"; fi
 else
     warn "could not resolve the destination block device; using conservative defaults"
 fi
