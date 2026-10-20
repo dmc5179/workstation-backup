@@ -124,6 +124,12 @@ elif [[ ! -s $FILTER_FILE ]]; then
 - **/index_tmp_*/
 - **/dirtyconf/
 
+# Cloned with sudo, so the whole tree is root:root. rclone --metadata tries
+# to preserve uid/gid and a non-root user cannot chown to root, which fails
+# the copy outright -- 942 files lost on the run of 2026-10-19. It is a
+# public repo plus a virtualenv, so re-clone it rather than back it up.
+- /workspace/waydroid_script/
+
 #
 # Measured on 2026-10-19: $HOME is 598G across ~4.5M files. These rules bring
 # that down to 401 GiB / 3,927,573 files.
