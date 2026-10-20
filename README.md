@@ -30,18 +30,32 @@ so it has no number.
 
 Order matters on the new machine: 06 installs node and podman, which 07 needs.
 
-## Measured facts for this machine (2026-10-19)
+## Measured facts for this machine
 
 | | |
 |---|---|
 | `$HOME` total | 598 GB logical across ~4.5M files |
-| **Backup size after filters** | **401 GiB / 3,927,573 files** |
+| Estimated after filters | 401 GiB / 3,927,573 files |
+| **Actually written** | **693 GB** |
 | Source | NVMe → LUKS → btrfs with `compress=zstd:1` |
-| Target | Samsung PSSD T7, 931 GB, **XFS**, 611 GiB free |
+| Target | Samsung PSSD T7, 931 GB, **XFS** |
 | Biggest exclusion | `~/.local/share/containers` (126 GB podman store) |
+| Link | USB 3.2 Gen 1, 5000 Mbps, measured 360–427 MB/s |
 
 `df` reports less used than `du` because `/home` is zstd-compressed. rclone
-copies *logical* bytes, so size the drive against 401 GiB, not the `df` figure.
+copies *logical* bytes, so size the drive against the `du` figure, not `df`.
+
+### Outcome of the 2026-10-20 run
+
+Completed in 30 minutes as an incremental pass over an existing copy:
+0 failed copies, 0 permission denied, 0 chown failures.
+
+`--verify` reported 48 discrepancies, all live state from running processes
+— 44 Chrome (IndexedDB, Sessions, LevelDB logs), 2 claude-mem, 2 GNOME
+`dconf`/notifications. Zero hits for `Bookmarks`, `.ssh`, `.gnupg`, `.aws`,
+`.kube`, keyrings, `Documents/`, `workspace/`, `places.sqlite`,
+`logins.json` or `key4.db`. That is the expected shape of a verify run with
+browsers open, not a problem.
 
 ---
 
@@ -99,10 +113,54 @@ The *config* comes across in the main home backup. This captures the *runtime*
 dependencies that do not: container images to pull, npm packages to pre-cache,
 binaries that must exist on PATH, and which servers need interactive re-auth.
 
-### 3. Quit all browsers
+### 3. Browsers: quit them, or plan a second pass
 
-Firefox, Chrome, Chromium and Thunderbird keep SQLite databases open. Copying
-them live risks an inconsistent profile. The scripts warn but do not block.
+Firefox, Chrome, Chromium and Thunderbird keep SQLite databases open, and
+rclone copies a `.sqlite` and its `-wal` sidecar seconds apart across a
+multi-hour run. The scripts warn but do not block.
+
+Leaving them open is a reasonable trade — bookmarks are safe either way,
+because `meta/bookmarks/` is snapshotted through SQLite's backup API, which
+is consistent even against a live database. What smears is history,
+cookies, open tabs and extension state.
+
+If you want a consistent profile, quit the browsers at the end and run a
+targeted second pass. It takes seconds:
+
+```bash
+rclone copy "$HOME" "$DEST/home" \
+  --filter '- .mozilla/firefox/*/cache2/**' \
+  --filter '- .config/*/*/Service Worker/**' \
+  --filter '- .config/*/*/Cache/**' \
+  --filter '- .config/*/*/Code Cache/**' \
+  --filter '- .config/*/*/GPUCache/**' \
+  --filter '- .config/*/*/File System/**' \
+  --filter '+ .mozilla/**' \
+  --filter '+ .config/google-chrome/**' \
+  --filter '+ .config/chromium/**' \
+  --filter '- *' \
+  --links --metadata --local-no-check-updated \
+  --transfers 8 --checkers 16 --progress
+```
+
+Use `--filter`, not `--exclude` plus `--include`: mixing those two does not
+honour command-line order, and the excludes are silently ignored.
+
+### 3b. Check file ownership first
+
+`--metadata` preserves `uid:gid`. A non-root user cannot `chown` a file to
+root, and rclone treats that failure as a **failed copy** — the file is
+skipped. One sudo-cloned repo cost 942 files on the first attempt.
+
+```bash
+find "$HOME" -xdev \
+  \( -path "$HOME/.local/share/containers" -o -path "$HOME/.cache" \) -prune -o \
+  ! -user "$USER" -print 2>/dev/null | head
+```
+
+Fix by chowning the offenders to yourself, or exclude them. **Never** blanket
+`chown -R` across `$HOME`: `~/.local/share/containers` holds rootless
+podman's UID-mapped overlay store and chowning it corrupts the store.
 
 ### 4. Back up
 
@@ -305,18 +363,23 @@ second place secrets leak to.
 `--transfers 16 --checkers 32` at 5 Gbps or better, `8/16` on USB 2.0, `4/8` on
 rotational media. Override with `--transfers` / `--checkers`.
 
-**I/O scheduler.** Both scripts temporarily set the USB drive to `mq-deadline`
-with `nr_requests=256` and **restore the original values on exit** — including
-on Ctrl-C or error. The T7 defaults to `bfq`, which optimises interactive
-fairness and throttles single-stream bulk transfer. `mq-deadline` is right in
-both directions: it batches sequential writes for the backup and already
-prioritises reads (500 ms expiry vs 5 s) for the restore.
+**I/O scheduler — opt-in via `--tune`, and probably not worth it.**
+`--tune` switches the external drive to `mq-deadline` with
+`nr_requests=256` and restores the original values on exit. The T7 defaults
+to `bfq`, which optimises interactive fairness and throttles single-stream
+bulk transfer; `mq-deadline` suits both directions, batching sequential
+writes and already prioritising reads (500 ms expiry vs 5 s).
 
-The internal NVMe is deliberately left alone — `none` with 12 hardware queues
-is already correct. I/O tuning is opt-in via `--tune`.
+It is off by default because the benefit was never measured, the workload
+is metadata-bound rather than bandwidth-bound, it costs a sudo prompt, and
+the revert can fail: `sudo`'s timestamp expires after five minutes while
+these runs last hours, so on exit the script may be unable to restore the
+setting. It now says so explicitly and prints the manual commands rather
+than silently claiming success. The change is not persistent — a reboot
+clears it.
 
-Expect a few percent from this, not a transformation. The real limits are the
-USB link rate and per-file overhead across 3.9M files.
+The internal NVMe is deliberately left alone: `none` with 12 hardware
+queues is already correct for it.
 
 **Verification.** Use `--verify` (size-based). `--verify-hash` MD5s every file
 and at this scale takes longer than the backup did.
