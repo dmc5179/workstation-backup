@@ -18,6 +18,7 @@ SRCDIR="" TARGET="${HOME%/}"
 DRY_RUN=0 ASSUME_YES=0 NO_OVERWRITE=0 RELABEL=0 TUNE=0 VERIFY=""
 TRANSFERS="" CHECKERS=""
 LOG_LEVEL=NOTICE
+FILTER_FILE="$HERE/restore-filters.txt"   # used if present; --filters overrides
 
 usage() {
     cat <<EOF
@@ -28,6 +29,9 @@ Usage: $PROG <backup-directory> [options]
 
 Options:
   --into DIR       Restore into DIR instead of \$HOME (useful for a staging run)
+  --filters FILE   rclone filter rules for what NOT to restore
+                   (default: restore-filters.txt next to this script)
+  --no-filters     Restore everything in the backup
   --no-overwrite   Never replace a file that already exists on this machine
   --relabel        Run 'sudo restorecon -R' on the target afterwards (SELinux)
   --tune           Switch the source disk to mq-deadline for the run (needs sudo)
@@ -45,6 +49,8 @@ EOF
 while (( $# )); do
     case $1 in
         --into)         TARGET=${2:?}; TARGET=${TARGET%/}; shift 2 ;;
+        --filters)      FILTER_FILE=${2:?}; shift 2 ;;
+        --no-filters)   FILTER_FILE=""; shift ;;
         --no-overwrite) NO_OVERWRITE=1; shift ;;
         --relabel)      RELABEL=1; shift ;;
         --tune)          TUNE=1; shift ;;
@@ -102,6 +108,7 @@ cat <<EOF
   Restore into: $TARGET
   Overwrite:    $( ((NO_OVERWRITE)) && echo "no (skip existing files)" || echo "yes, when size/mtime differ" )
   Concurrency:  --transfers $TRANSFERS --checkers $CHECKERS
+  Filters:      ${FILTER_FILE:-none (restoring everything)}
   Log:          $LOG
 
 EOF
@@ -121,6 +128,12 @@ OPTS=(
 [[ -t 1 ]]         && OPTS+=( --progress )
 (( DRY_RUN ))      && OPTS+=( --dry-run )
 (( NO_OVERWRITE )) && OPTS+=( --ignore-existing )
+FILT=()
+if [[ -n $FILTER_FILE ]]; then
+    [[ -r $FILTER_FILE ]] || die "filter file not readable: $FILTER_FILE"
+    FILT=( --filter-from "$FILTER_FILE" )
+fi
+OPTS+=( "${FILT[@]}" )
 
 info "Starting rclone copy ..."
 rclone copy "$SRCDIR/home" "$TARGET" "${OPTS[@]}"
@@ -160,7 +173,7 @@ fi
 
 if [[ -n $VERIFY && $DRY_RUN -eq 0 ]]; then
     info "Verifying ($VERIFY)..."
-    CHK=( check "$SRCDIR/home" "$TARGET" --one-way --links --checkers "$CHECKERS"
+    CHK=( check "$SRCDIR/home" "$TARGET" --one-way --links --checkers "$CHECKERS" "${FILT[@]}"
           --log-file "${LOG%.log}-verify.log" --log-level INFO
           --missing-on-dst "${LOG%.log}-missing.txt"
           --differ         "${LOG%.log}-differ.txt" )

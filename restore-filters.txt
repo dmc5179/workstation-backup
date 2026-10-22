@@ -1,0 +1,19 @@
+# rclone filter rules for 05-restore-home.sh: what NOT to restore.
+# FIRST MATCH WINS. Anchored with a leading '/' so each rule applies only at
+# the top of the home directory, never to a same-named directory deeper down.
+
+# --- Never overwrite access control on the machine being restored to --------
+# The backup's copy dates from 2019. Restoring it would replace the key that
+# lets you ssh into the new laptop. Merge by hand if you want old entries.
+- /.ssh/authorized_keys
+
+# --- Reinstalled fresh instead, so they keep receiving updates ---------------
+# Copied binaries go stale and pip entry points are bound to the old Python's
+# site-packages. See README "Reinstall tools" for the install commands.
+- /.local/bin/**
+- /.local/lib/python*/**
+- /.local/share/claude/versions/**
+- /.local/share/uv/**
+- /.local/share/pipx/**
+- /.hf-cli/**
+- /go/bin/**

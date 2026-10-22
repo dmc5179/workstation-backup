@@ -241,6 +241,27 @@ Uses `rclone copy`, so it never deletes anything already on the new machine.
 Afterwards it repairs permissions on `.ssh`, `.gnupg`, keyrings, `.aws`,
 `.docker` and `.kube/config`, then prints a post-restore checklist.
 
+### 5b. Reinstall tools rather than restoring them
+
+`05-restore-home.sh` reads `restore-filters.txt` by default and deliberately
+does **not** restore `~/.local/bin`, `~/.local/lib/python*`, the Claude
+`versions/` directory, `uv`/`pipx` trees or `~/go/bin`. Copied binaries stop
+receiving updates, and pip `--user` entry points are bound to the old
+machine's `site-packages`. Reinstall them instead:
+
+| Tool | Install |
+|---|---|
+| Claude Code | `curl -fsSL https://claude.ai/install.sh \| bash` |
+| `gws` | `sudo npm install -g @googleworkspace/cli` |
+| `gcloud` | Google's `google-cloud-cli` dnf repo, then `sudo dnf install google-cloud-cli` |
+| `gopls` | `go install golang.org/x/tools/gopls@latest` |
+| `codebase-memory-mcp` | `curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh \| bash` |
+| pip `--user` tools | only the ones you still use: `pip install --user <name>` |
+
+The filter also skips `~/.ssh/authorized_keys`, so a restore can't replace the
+key you're using to reach the new machine. Use `--filters FILE` to supply your
+own rules, or `--no-filters` to restore everything.
+
 ### 6. Reinstall packages
 
 ```bash
